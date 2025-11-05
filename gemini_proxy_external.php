@@ -1,20 +1,19 @@
 <?php
 // gemini_proxy_external.php (На ВНЕШНЕМ ПРОКСИ-СЕРВЕРЕ, НАПРИМЕР, RENDER)
 
-// Разрешаем CORS, так как запрос идет с другого домена (вашего игрового хостинга)
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *'); 
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
 // --- 1. НАСТРОЙКА КЛЮЧА GEMINI API ---
-// !!! КЛЮЧ СЧИТЫВАЕТСЯ ИЗ ПЕРЕМЕННОЙ ОКРУЖЕНИЯ RENDER !!!
+// КЛЮЧ СЧИТЫВАЕТСЯ ИЗ ПЕРЕМЕННОЙ ОКРУЖЕНИЯ RENDER (GEMINI_API_KEY)
 if (!getenv('GEMINI_API_KEY')) {
     http_response_code(500);
     echo json_encode(['error' => 'API Key environment variable is not set.']);
     exit;
 }
-define('GEMINI_API_KEY', getenv('AIzaSyA6r3FJJKumWq2qmN8x0mdaPc3PdcQ6t-k')); 
+define('GEMINI_API_KEY', getenv('GEMINI_API_KEY')); 
 define('GEMINI_MODEL', 'gemini-2.5-flash'); 
 // ----------------------------------------
 
@@ -45,7 +44,7 @@ $messages_to_gemini = $input_data['messages'];
 $curl = curl_init();
 $api_url = "https://generativelanguage.googleapis.com/v1beta/models/" . GEMINI_MODEL . ":generateContent?key=" . GEMINI_API_KEY;
 
-// !!! ИСПРАВЛЕНО: 'config' заменено на 'generationConfig' !!!
+// ИСПРАВЛЕНО: 'config' заменено на 'generationConfig'
 $request_payload = json_encode([
     'contents' => $messages_to_gemini,
     'generationConfig' => [ 
@@ -56,20 +55,22 @@ $request_payload = json_encode([
 curl_setopt_array($curl, [
     CURLOPT_URL => $api_url,
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT => 30, // Таймаут 30 секунд
+    CURLOPT_TIMEOUT => 30, 
     CURLOPT_CUSTOMREQUEST => "POST",
     CURLOPT_POSTFIELDS => $request_payload,
     CURLOPT_HTTPHEADER => ["Content-Type: application/json", "Accept: application/json"],
+    // !!! ВРЕМЕННО ОТКЛЮЧАЕМ ПРОВЕРКУ SSL ДЛЯ ДИАГНОСТИКИ !!!
+    CURLOPT_SSL_VERIFYPEER => false,
+    CURLOPT_SSL_VERIFYHOST => false,
 ]);
 
 $response = curl_exec($curl);
 $err = curl_error($curl);
 curl_close($curl);
 
-// --- 3. ОБРАБОТКА ОТВЕТА И ВОЗВРАТ ---
+// --- 3. ОБРАБОТКА ОТВЕТА И ВОЗВРАТ НА ИГРОВОЙ ХОСТИНГ ---
 
 if ($err) {
-    // В случае ошибки cURL на Render
     http_response_code(502);
     echo json_encode(['error' => 'Прокси cURL Error: ' . $err]);
     exit;
@@ -78,7 +79,6 @@ if ($err) {
 $response_data = json_decode($response, true);
 
 if (isset($response_data['error'])) {
-    // В случае ошибки, возвращенной от Gemini API
     http_response_code(500);
     echo json_encode(['error' => 'Gemini API Error: ' . ($response_data['error']['message'] ?? 'Unknown error')]);
     exit;
