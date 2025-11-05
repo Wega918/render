@@ -1,4 +1,4 @@
-# Dockerfile (ОБНОВЛЕННЫЙ)
+# Dockerfile (ФИНАЛЬНЫЙ ОБНОВЛЕННЫЙ)
 
 # 1. Используем официальный образ PHP с веб-сервером Apache
 FROM php:8.2-apache
@@ -6,10 +6,18 @@ FROM php:8.2-apache
 # 2. Устанавливаем корневую директорию сервера
 WORKDIR /var/www/html
 
-# !!! КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Установка расширения cURL !!!
-# Устанавливаем cURL, который нужен для исходящих API-запросов
-RUN apt-get update && apt-get install -y libcurl4-openssl-dev \
-    && docker-php-ext-install curl
+# !!! КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Установка cURL, SSL и других зависимостей !!!
+# Устанавливаем необходимые системные пакеты и PHP-расширения
+RUN apt-get update && apt-get install -y \
+    libcurl4-openssl-dev \
+    libxml2-dev \
+    git \
+    zip \
+    unzip \
+    && rm -rf /var/lib/apt/lists/* \
+    && docker-php-ext-install -j$(nproc) iconv pdo_mysql \
+    && docker-php-ext-install curl \
+    && docker-php-ext-enable curl 
 
 # 3. Копируем ваш скрипт-прокси в корень веб-сервера
 COPY gemini_proxy_external.php .
